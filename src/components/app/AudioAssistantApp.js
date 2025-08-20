@@ -343,6 +343,10 @@ export class AudioAssistantApp extends LitElement {
         this.chunkInterval = null;
         this.audioDevices = [];
         this.selectedAudioDevice = localStorage.getItem('selectedAudioDevice') || 'default';
+        
+        // NEW: Property to hold the pre-processed audio data.
+        // We will keep this blob updated in the background.
+        this.preparedAudioBlob = null;
     }
 
     connectedCallback() {
@@ -492,7 +496,7 @@ export class AudioAssistantApp extends LitElement {
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://aistudio.google.com/apikey');
+            await ipcRenderer.invoke('open-external', 'https://aistudio.google.com/apikey  ');
         }
     }
 
@@ -529,12 +533,14 @@ export class AudioAssistantApp extends LitElement {
         try {
             this.isRecording = true;
             this.errorMessage = '';
+            // Reset our data holders
             this.audioChunks = [];
+            this.preparedAudioBlob = null; 
 
             const constraints = {
                 audio: {
                     deviceId: this.selectedAudioDevice === 'default' ? undefined : { exact: this.selectedAudioDevice },
-                    sampleRate: 48000,
+                    sampleRate: 24000,
                     channelCount: 1,
                     echoCancellation: true,
                     noiseSuppression: true,
@@ -544,30 +550,34 @@ export class AudioAssistantApp extends LitElement {
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
 
+            // This part is simple: just collect the data chunks as they become available.
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) this.audioChunks.push(event.data);
             };
 
+            // When recording is stopped, we trigger the final processing.
             this.mediaRecorder.onstop = () => {
                 stream.getTracks().forEach(track => track.stop());
-                this.processAudioChunks();
+                // Use the already prepared blob for instant processing.
+                this.processAudio(); 
             };
 
             this.mediaRecorder.start();
 
-            // --- UPDATED COMMENT: Clarify the purpose of the interval ---
-            // Periodically request data from the MediaRecorder to flush its internal buffer.
-            // The full collection of audio chunks is only processed when recording stops.
+            // CHANGED: The interval now does the background work.
+            // It periodically prepares the blob from the collected chunks.
             this.chunkInterval = setInterval(() => {
                 if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    // This requests the data so far, which triggers 'ondataavailable'.
                     this.mediaRecorder.requestData();
+                    // After requesting, we can prepare the blob.
+                    this.prepareAudioInBackground();
                 }
-            }, 5000); // Flush buffer every 5 seconds.
-            // --- END UPDATED COMMENT ---
+            }, 200); // Prepare the blob every 0.2 seconds.
 
         } catch (error) {
             console.error('Error starting recording:', error);
-            this.errorMessage = 'Failed to access the selected audio device. Please check permissions or try another device.';
+            this.errorMessage = 'Failed to access audio device.';
             this.isRecording = false;
         }
     }
@@ -583,39 +593,55 @@ export class AudioAssistantApp extends LitElement {
         this.isRecording = false;
     }
 
-    async processAudioChunks() {
-        if (this.audioChunks.length === 0) {
-            this.isProcessing = false;
+    // NEW: Background function to do the heavy lifting.
+    prepareAudioInBackground() {
+        // This function is designed to be lightweight and run frequently.
+        if (this.audioChunks.length > 0) {
+            // Create a new Blob from all chunks collected so far.
+            // This is very fast.
+            this.preparedAudioBlob = new Blob(this.audioChunks, { type: 'audio/webm;codecs=opus' });
+            console.log(`Background prep: Blob size is now ${this.preparedAudioBlob.size} bytes`);
+        }
+    }
+
+    // RENAMED & REFACTORED: Was `processAudioChunks`, now it's simpler.
+    async processAudio() {
+        // Instantly check if we have the prepared blob.
+        if (!this.preparedAudioBlob || this.preparedAudioBlob.size === 0) {
+            console.log('No audio data to process.');
             return;
         }
 
-        const chunksToProcess = [...this.audioChunks];
-        this.audioChunks = [];
-
-        this.isProcessing = true;
-        if (this.errorMessage && this.errorMessage.startsWith('Error processing audio')) {
-             this.errorMessage = '';
-        }
-
+        // --- THIS IS THE KEY OPTIMIZATION ---
+        // There's no more waiting to create the Blob. It's already here.
+        // We just need to do the final, fast conversion to Base64.
+        
+        this.isProcessing = true; // Set UI state to processing
+        
         try {
-            const audioBlob = new Blob(chunksToProcess, { type: 'audio/webm;codecs=opus' });
             const reader = new FileReader();
 
             reader.onloadend = async () => {
                 const base64Data = reader.result.split(',')[1];
                 if (window.require) {
                     const { ipcRenderer } = window.require('electron');
+                    // Send to the main process immediately.
                     ipcRenderer.invoke('process-audio-message', {
                         data: base64Data,
                         mimeType: 'audio/webm;codecs=opus'
                     });
                 }
             };
-
-            reader.readAsDataURL(audioBlob);
+            
+            // This is the only "work" left to do, and it's very fast.
+            reader.readAsDataURL(this.preparedAudioBlob);
+            
+            // Clean up for the next session
+            this.audioChunks = [];
+            this.preparedAudioBlob = null;
 
         } catch (error) {
-            console.error('Error processing audio chunks:', error);
+            console.error('Error processing audio:', error);
             this.errorMessage = 'Error processing audio: ' + error.message;
             this.isProcessing = false;
         }

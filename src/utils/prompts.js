@@ -1,3 +1,5 @@
+// src/utils/prompts.js
+
 const profilePrompts = {
     interview: {
         intro: `You are an AI-powered interview assistant. Analyze the audio input and provide concise, impactful answers or talking points for job interviews.`,
@@ -63,7 +65,9 @@ function getSystemPrompt(profile, customPrompt = '', googleSearchEnabled = true)
         systemPrompt += '\n\nUser Context:\n' + customPrompt.trim();
     }
     
-    systemPrompt += '\n\nProvide concise, helpful responses in markdown format. Keep responses short and actionable.';
+    // --- CHANGED: Added instruction to prioritize speed ---
+    systemPrompt += '\n\nYour primary goal is speed. Provide concise, helpful responses in markdown format. Keep responses short and actionable. Begin generating your response immediately.';
+    // --- END CHANGED ---
     
     return systemPrompt;
 }

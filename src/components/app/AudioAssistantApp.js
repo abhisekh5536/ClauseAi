@@ -25,6 +25,7 @@ export class AudioAssistantApp extends LitElement {
             height: 100vh;
             border-radius: 7px;
             overflow: hidden;
+            
         }
 
         .container {
@@ -436,7 +437,7 @@ export class AudioAssistantApp extends LitElement {
             if (success) {
                 this.sessionActive = true;
                 this.currentView = 'assistant';
-                this.response = `Audio Assistant is ready. Press ${navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Cmd+Shift+A' : 'Ctrl+Shift+A'} to start/stop listening.`;
+                this.response = `Clause Ai is ready. Press ${navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'Cmd+Shift+A' : 'Ctrl+Shift+A'} to start/stop listening.`;
                 this.successMessage = 'Session started successfully';
                 this.statusText = '';
                 this.isProcessing = false;
@@ -663,7 +664,8 @@ export class AudioAssistantApp extends LitElement {
 
         return html`
             <div class="main-view">
-                <div class="welcome">Audio Assistant</div>
+                <div class="welcome">Are you ready to Crack?</div>
+
 
                 ${this.errorMessage ? html`<div class="error-message">${this.errorMessage}</div>` : ''}
                 ${this.successMessage ? html`<div class="success-message">${this.successMessage}</div>` : ''}
@@ -772,7 +774,8 @@ export class AudioAssistantApp extends LitElement {
                 <div class="container">
                     <div class="header">
                         <div class="header-title">
-                            ${isAssistantView ? 'Audio Assistant - Active' : 'Audio Assistant'}
+                            
+                            ${isAssistantView ? 'Clause Ai - Active' : 'Clause Ai'} 
                         </div>
                         <div class="header-actions">
                             ${isAssistantView ? html`

@@ -6,6 +6,8 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow } = require('./utils/window');
 const { setupGeminiIpcHandlers, sendToRenderer } = require('./utils/gemini');
 
+
+
 let mainWindow = null;
 
 function createMainWindow() {

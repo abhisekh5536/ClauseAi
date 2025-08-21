@@ -4,12 +4,13 @@ const path = require('node:path');
 function createWindow(sendToRenderer) {
     const mainWindow = new BrowserWindow({
         width: 600,
-        height: 400,
+        height: 800,
         frame: false,
         transparent: true,
         hasShadow: false,
         alwaysOnTop: true,
         skipTaskbar: true,
+        show: false, // <-- Fix for startup flicker
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -18,6 +19,12 @@ function createWindow(sendToRenderer) {
             allowRunningInsecureContent: false,
         },
         backgroundColor: '#00000000',
+        opacity: 0.95, // Your initial opacity setting
+    });
+    
+    // Gracefully show the window when the content is ready to prevent flicker
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
     });
 
     mainWindow.setResizable(false);
@@ -95,6 +102,45 @@ function setupKeyboardShortcuts(mainWindow, sendToRenderer) {
             mainWindow.setIgnoreMouseEvents(false);
             console.log('Mouse events enabled');
         }
+    });
+
+    // --- NEW: Zoom Controls ---
+    const zoomIncrement = 0.1;
+
+    // Zoom In (Ctrl + =)
+    globalShortcut.register('CommandOrControl+=', () => {
+        const currentZoom = mainWindow.webContents.getZoomFactor();
+        mainWindow.webContents.setZoomFactor(currentZoom + zoomIncrement);
+    });
+    
+    // Zoom Out (Ctrl + -)
+    globalShortcut.register('CommandOrControl+-', () => {
+        const currentZoom = mainWindow.webContents.getZoomFactor();
+        mainWindow.webContents.setZoomFactor(Math.max(0.2, currentZoom - zoomIncrement));
+    });
+    
+    // Reset Zoom (Ctrl + 0)
+    globalShortcut.register('CommandOrControl+0', () => {
+        mainWindow.webContents.setZoomFactor(1.0);
+    });
+
+    // --- NEW: Opacity Controls ---
+    const opacityIncrement = 0.1; // Change by 10% each time
+
+    // Decrease Opacity (make more transparent) with Ctrl + ,
+    globalShortcut.register('CommandOrControl+,', () => {
+        const currentOpacity = mainWindow.getOpacity();
+        // Set a minimum opacity so the window doesn't become completely invisible
+        const newOpacity = Math.max(0.2, currentOpacity - opacityIncrement); 
+        mainWindow.setOpacity(newOpacity);
+    });
+
+    // Increase Opacity (make more opaque) with Ctrl + .
+    globalShortcut.register('CommandOrControl+.', () => {
+        const currentOpacity = mainWindow.getOpacity();
+        // Set a maximum opacity of 1.0 (fully opaque)
+        const newOpacity = Math.min(1.0, currentOpacity + opacityIncrement);
+        mainWindow.setOpacity(newOpacity);
     });
 }
 
